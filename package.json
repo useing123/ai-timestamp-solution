@@ -13,7 +13,7 @@
   },
   "scripts": {
     "test": "node timestamp.test.js",
-    "benchmark": "node -e \"import('./timestamp.test.js')\"",
+    "benchmark": "node benchmark.js",
     "validate": "node -c timestamp.js && echo 'Syntax validation passed'",
     "demo": "node -e \"import('./timestamp.js').then(m => { console.log('Generated timestamp:', m.generateTimestamp48()); console.log('Fast timestamp:', m.generateTimestamp48Fast()); })\""
   },

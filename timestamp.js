@@ -21,14 +21,19 @@ for (let i = 0; i < 64; i++) {
   ENCODE_TABLE[i] = BASE64URL_CHARS[i];
 }
 
-// Pre-computed decode table for reverse operations
-const DECODE_TABLE = new Map();
+// Pre-computed decode table for reverse operations (array is faster than Map)
+const DECODE_TABLE = new Array(256).fill(-1);
 for (let i = 0; i < BASE64URL_CHARS.length; i++) {
-  DECODE_TABLE.set(BASE64URL_CHARS[i], i);
+  DECODE_TABLE[BASE64URL_CHARS.charCodeAt(i)] = i;
 }
 
 // State for generating unique, monotonic timestamps
 let lastGeneratedTimestamp = 0;
+
+// Reusable buffer for performance optimization
+const REUSABLE_BUFFER = new Uint8Array(6);
+const FAST_BUFFER = new ArrayBuffer(8);
+const FAST_VIEW = new DataView(FAST_BUFFER);
 
 /**
  * Generates a 48-bit timestamp and encodes it as Base64URL
@@ -76,7 +81,8 @@ export function generateTimestamp48() {
   const c6 = ENCODE_TABLE[(g2 >>> 6) & 0x3F];
   const c7 = ENCODE_TABLE[g2 & 0x3F];
   
-  return c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7;
+  // Use template literal for better performance than string concatenation
+  return `${c0}${c1}${c2}${c3}${c4}${c5}${c6}${c7}`;
 }
 
 /**
@@ -101,35 +107,69 @@ export function decodeTimestamp48(encoded) {
   // Decode Base64URL back to 6 bytes
   const bytes = new Uint8Array(6);
   
-  // Decode first 4 characters to first 3 bytes
-  const g1 = (DECODE_TABLE.get(encoded[0]) << 18) |
-             (DECODE_TABLE.get(encoded[1]) << 12) |
-             (DECODE_TABLE.get(encoded[2]) << 6) |
-             DECODE_TABLE.get(encoded[3]);
+  // Decode first 4 characters to first 3 bytes (using array lookup)
+  const g1 = (DECODE_TABLE[encoded.charCodeAt(0)] << 18) |
+             (DECODE_TABLE[encoded.charCodeAt(1)] << 12) |
+             (DECODE_TABLE[encoded.charCodeAt(2)] << 6) |
+             DECODE_TABLE[encoded.charCodeAt(3)];
   
   bytes[0] = (g1 >>> 16) & 0xFF;
   bytes[1] = (g1 >>> 8) & 0xFF;
   bytes[2] = g1 & 0xFF;
   
-  // Decode last 4 characters to last 3 bytes
-  const g2 = (DECODE_TABLE.get(encoded[4]) << 18) |
-             (DECODE_TABLE.get(encoded[5]) << 12) |
-             (DECODE_TABLE.get(encoded[6]) << 6) |
-             DECODE_TABLE.get(encoded[7]);
+  // Decode last 4 characters to last 3 bytes (using array lookup)
+  const g2 = (DECODE_TABLE[encoded.charCodeAt(4)] << 18) |
+             (DECODE_TABLE[encoded.charCodeAt(5)] << 12) |
+             (DECODE_TABLE[encoded.charCodeAt(6)] << 6) |
+             DECODE_TABLE[encoded.charCodeAt(7)];
   
   bytes[3] = (g2 >>> 16) & 0xFF;
   bytes[4] = (g2 >>> 8) & 0xFF;
   bytes[5] = g2 & 0xFF;
   
-  // Reconstruct 48-bit timestamp using safe arithmetic
-  const timestamp = bytes[0] * Math.pow(2, 40) +
-                   bytes[1] * Math.pow(2, 32) +
-                   bytes[2] * Math.pow(2, 24) +
-                   bytes[3] * Math.pow(2, 16) +
-                   bytes[4] * Math.pow(2, 8) +
+  // Reconstruct 48-bit timestamp using optimized arithmetic
+  // Use bit shifting where possible for better performance
+  const timestamp = bytes[0] * 0x10000000000 +  // 2^40
+                   bytes[1] * 0x100000000 +    // 2^32 
+                   (bytes[2] << 24) +           // 2^24
+                   (bytes[3] << 16) +           // 2^16
+                   (bytes[4] << 8) +            // 2^8
                    bytes[5];
   
   return timestamp;
+}
+
+/**
+ * Ultra-fast 48-bit timestamp generator using optimized techniques
+ * @returns {string} 8-character Base64URL encoded timestamp
+ * @throws {Error} If Date.now() is not available or returns invalid value
+ */
+export function generateTimestamp48Fast() {
+  let now = Date.now();
+  
+  // Ensure timestamp is monotonic and unique
+  if (now <= lastGeneratedTimestamp) {
+    now = lastGeneratedTimestamp + 1;
+  }
+  lastGeneratedTimestamp = now;
+  
+  // Use DataView for optimal performance with 48-bit big-endian encoding
+  FAST_VIEW.setBigUint64(0, BigInt(now), false); // Big-endian
+  
+  // Extract 6 bytes directly from the DataView (last 6 bytes contain our 48-bit timestamp)
+  const b0 = FAST_VIEW.getUint8(2); // Skip first 2 bytes for 48-bit extraction
+  const b1 = FAST_VIEW.getUint8(3);
+  const b2 = FAST_VIEW.getUint8(4);
+  const b3 = FAST_VIEW.getUint8(5);
+  const b4 = FAST_VIEW.getUint8(6);
+  const b5 = FAST_VIEW.getUint8(7);
+  
+  // Inline Base64URL encoding with direct indexing
+  const g1 = (b0 << 16) | (b1 << 8) | b2;
+  const g2 = (b3 << 16) | (b4 << 8) | b5;
+  
+  // Direct character lookup and template literal assembly
+  return `${ENCODE_TABLE[g1 >>> 18]}${ENCODE_TABLE[(g1 >>> 12) & 0x3F]}${ENCODE_TABLE[(g1 >>> 6) & 0x3F]}${ENCODE_TABLE[g1 & 0x3F]}${ENCODE_TABLE[g2 >>> 18]}${ENCODE_TABLE[(g2 >>> 12) & 0x3F]}${ENCODE_TABLE[(g2 >>> 6) & 0x3F]}${ENCODE_TABLE[g2 & 0x3F]}`;
 }
 
 /**
@@ -149,9 +189,12 @@ export function generateBatch(count = 1, options = {}) {
     throw new Error('Options must be an object');
   }
   
+  const { fast = false } = options;
   const results = new Array(count);
+  const generator = fast ? generateTimestamp48Fast : generateTimestamp48;
+  
   for (let i = 0; i < count; i++) {
-    results[i] = generateTimestamp48();
+    results[i] = generator();
   }
   return results;
 }

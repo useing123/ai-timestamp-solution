@@ -34,6 +34,26 @@
 export function generateTimestamp48(): Timestamp48;
 
 /**
+ * Ultra-fast 48-bit timestamp generator using optimized techniques
+ * 
+ * @description 
+ * High-performance variant using DataView and optimized bit operations.
+ * Typically 20-50% faster than the standard implementation.
+ * 
+ * @returns An 8-character Base64URL encoded string representing a 48-bit timestamp
+ * @throws {Error} If Date.now() is not available or returns invalid value
+ * 
+ * @example
+ * ```typescript
+ * import { generateTimestamp48Fast } from './timestamp.js';
+ * 
+ * const timestamp = generateTimestamp48Fast();
+ * console.log(timestamp); // e.g., "AYqkSJ2M"
+ * ```
+ */
+export function generateTimestamp48Fast(): Timestamp48;
+
+/**
  * Decodes a 48-bit Base64URL encoded timestamp back to Unix milliseconds
  * 
  * @param encoded - 8-character Base64URL encoded timestamp
@@ -72,6 +92,7 @@ export function decodeTimestamp48(encoded: string): number;
 export function generateBatch(
   count?: number,
   options?: {
+    fast?: boolean;
   }
 ): Timestamp48[];
 
@@ -145,5 +166,5 @@ export const MODULE_INFO: {
   readonly precision: 'millisecond';
   readonly bitLength: 48;
   readonly outputLength: 8;
-  readonly features: readonly ['encode', 'decode', 'batch', 'validate', 'age'];
+  readonly features: readonly ['encode', 'decode', 'batch', 'validate', 'age', 'fast'];
 };

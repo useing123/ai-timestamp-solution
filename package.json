@@ -1,0 +1,57 @@
+{
+  "name": "timestamp-48bit",
+  "version": "1.0.0",
+  "description": "High-performance 48-bit timestamp generator with Base64URL encoding for Code with AI Contest",
+  "type": "module",
+  "main": "timestamp.js",
+  "types": "timestamp.d.ts",
+  "exports": {
+    ".": {
+      "import": "./timestamp.js",
+      "types": "./timestamp.d.ts"
+    }
+  },
+  "scripts": {
+    "test": "node timestamp.test.js",
+    "benchmark": "node -e \"import('./timestamp.test.js')\"",
+    "validate": "node -c timestamp.js && echo 'Syntax validation passed'",
+    "demo": "node -e \"import('./timestamp.js').then(m => { console.log('Generated timestamp:', m.generateTimestamp48()); console.log('Fast timestamp:', m.generateTimestamp48Fast()); })\""
+  },
+  "keywords": [
+    "timestamp",
+    "uuid",
+    "uuidv7", 
+    "base64url",
+    "performance",
+    "48-bit",
+    "contest",
+    "high-performance",
+    "javascript",
+    "cross-platform"
+  ],
+  "author": "AI Generated Solution for Code with AI Contest",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/username/code-with-ai-contest"
+  },
+  "bugs": {
+    "url": "https://github.com/username/code-with-ai-contest/issues"
+  },
+  "homepage": "https://github.com/username/code-with-ai-contest#readme",
+  "files": [
+    "timestamp.js",
+    "timestamp.d.ts",
+    "timestamp.test.js",
+    "README.md",
+    "SETUP.md",
+    "AI_PROMPTS.md"
+  ],
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/sponsors/username"
+  }
+}
